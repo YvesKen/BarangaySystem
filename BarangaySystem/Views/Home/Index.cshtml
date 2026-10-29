@@ -1,0 +1,644 @@
+﻿@model IEnumerable<BarangaySystem.Models.Resident>
+
+@{
+    ViewData["Title"] = "Dashboard";
+}
+
+<style>
+    /* Print-specific styling to ensure exact A4/Letter clearance layout when printed */
+    @@media print {
+        body * {
+            visibility: hidden;
+        }
+
+        #printArea, #printArea * {
+            visibility: visible;
+        }
+
+        #printArea {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            border: none !important;
+            box-shadow: none !important;
+        }
+    }
+</style>
+
+<div class="row g-4">
+    <!-- MODULE 1: RESIDENT PROFILES -->
+    <div class="col-lg-7">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <div>
+                <small class="text-uppercase text-muted fw-bold">Module 1</small>
+                <h4 class="fw-bold mb-0">RESIDENT PROFILES</h4>
+            </div>
+            <div class="d-flex gap-2">
+                <input type="text" class="form-control form-control-sm" placeholder="Search Residents..." style="width: 250px;" />
+                <button class="btn btn-primary btn-sm d-flex align-items-center gap-1" data-bs-toggle="modal" data-bs-target="#newResidentModal">
+                    <i class="fa-solid fa-plus"></i> NEW RESIDENT
+                </button>
+            </div>
+        </div>
+
+        <div class="card-custom p-3">
+            <h6 class="fw-bold text-secondary mb-3">Resident Profiles Table</h6>
+            <div class="table-responsive">
+                <table class="table table-hover align-middle fs-7 mb-0">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Photo</th>
+                            <th>Resident ID</th>
+                            <th>Full Name</th>
+                            <th>Gender</th>
+                            <th>DOB</th>
+                            <th>Address</th>
+                            <th>Purok</th>
+                            <th>Contact</th>
+                            <th>Status</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @if (Model != null && Model.Any())
+                        {
+                            @foreach (var res in Model)
+                            {
+                                <tr>
+                                    <td><img src="https://via.placeholder.com/35" class="rounded-circle" /></td>
+                                    <td>RP@(res.ResidentID.ToString("D8"))</td>
+                                    <td class="fw-semibold text-nowrap">@res.FullName</td>
+                                    <td>@res.Gender</td>
+                                    <td>@res.BirthDate.ToString("MM/dd/yyyy")</td>
+                                    <td>@res.AddressLine</td>
+                                    <td>@res.Purok</td>
+                                    <td>@res.ContactNumber</td>
+                                    <td><span class="badge bg-success-subtle text-success border border-success">ACTIVE</span></td>
+                                    <td>
+                                        <i class="fa-regular fa-pen-to-square text-warning me-2" style="cursor:pointer;"
+                                           onclick="openEditModal('@res.ResidentID', '@res.FirstName', '@res.MiddleName', '@res.LastName', '@res.Suffix', '@res.Gender', '@res.BirthDate.ToString("yyyy-MM-dd")', '@res.CivilStatus', '@res.AddressLine', '@res.Purok', '@res.ContactNumber', '@res.VoterStatus')"></i>
+
+                                        <i class="fa-regular fa-trash-can text-danger" style="cursor:pointer;"
+                                           onclick="openDeleteModal('@res.ResidentID', '@res.FullName')"></i>
+                                    </td>
+                                </tr>
+                            }
+                        }
+                        else
+                        {
+                            <tr>
+                                <td colspan="10" class="text-center text-muted">No residents found in database.</td>
+                            </tr>
+                        }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <!-- MODULE 2: CLEARANCE & CERTIFICATE GENERATOR -->
+    <div class="col-lg-5">
+        <div class="mb-3">
+            <small class="text-uppercase text-muted fw-bold">Module 2</small>
+            <h4 class="fw-bold mb-0">CLEARANCE & CERTIFICATE GENERATOR</h4>
+        </div>
+
+        @if (TempData["SuccessMessage"] != null)
+        {
+            <div class="alert alert-success alert-dismissible fade show small mb-3" role="alert">
+                <i class="fa-solid fa-circle-check me-2"></i> @TempData["SuccessMessage"]
+                <button type="button" class="btn-close" data-bs-dismiss="alert" aria-label="Close"></button>
+            </div>
+        }
+
+        <div class="card-custom p-3 mb-3">
+            <form asp-action="IssueClearance" method="post" onsubmit="prepareFormSubmission()">
+                <div class="row g-2 mb-3">
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-secondary mb-1">SELECT RESIDENT</label>
+                        <select class="form-select form-select-sm" id="residentSelect" name="residentId" onchange="updatePreview()">
+                            @if (Model != null)
+                            {
+                                @foreach (var res in Model)
+                                {
+                                    <option value="@res.ResidentID" data-fullname="@res.FullName" data-purok="@res.Purok" data-address="@res.AddressLine" data-civilstatus="@res.CivilStatus">@res.FullName</option>
+                                }
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-secondary mb-1">DOCUMENT TYPE</label>
+                        <select class="form-select form-select-sm" id="docTypeSelect" name="documentType" onchange="updatePreview()">
+                            <option value="Barangay Clearance">Barangay Clearance</option>
+                            <option value="Certificate of Indigency">Certificate of Indigency</option>
+                            <option value="Certificate of Residency">Certificate of Residency</option>
+                            <option value="Business Permit">Business Permit</option>
+                            <option value="Certificate of Low Income">Certificate of Low Income</option>
+                            <option value="Certificate of Good Moral Character">Good Moral Character</option>
+                            <option value="Certificate of Cohabitation">Certificate of Cohabitation</option>
+                            <option value="First Time Jobseeker Certificate">First Time Jobseeker</option>
+                        </select>
+                    </div>
+                    <div class="col-md-4">
+                        <label class="form-label small fw-bold text-secondary mb-1">PURPOSE</label>
+                        <select class="form-select form-select-sm" id="purposeSelect" onchange="handlePurposeChange()">
+                            <option value="For Employment">For Employment</option>
+                            <option value="For Scholarship Application">For Scholarship</option>
+                            <option value="For Postal ID / Government ID">For Postal ID / Govt ID</option>
+                            <option value="For Financial / Medical Assistance">For Financial Assistance</option>
+                            <option value="For Travel / Transfer of Residence">For Travel / Transfer</option>
+                            <option value="For Business Permit Application">For Business Permit</option>
+                            <option value="For Senior Citizen Discount">For Senior Citizen</option>
+                            <option value="Other">Other (Type Custom)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <!-- CUSTOM PURPOSE INPUT -->
+                <div class="mb-3 d-none" id="customPurposeContainer">
+                    <label class="form-label small fw-bold text-secondary mb-1">SPECIFY CUSTOM PURPOSE</label>
+                    <input type="text" class="form-control form-control-sm" id="customPurposeInput" placeholder="e.g., Bank Account Opening" oninput="updatePreview()" />
+                </div>
+
+                <input type="hidden" id="hiddenPurpose" name="purpose" value="For Employment" />
+                <input type="hidden" name="amountPaid" value="50.00" />
+                <button type="submit" class="btn btn-primary btn-sm w-100 fw-bold">
+                    <i class="fa-solid fa-file-signature me-1"></i> GENERATE & SAVE TO DB
+                </button>
+            </form>
+        </div>
+
+        <!-- AUTHENTIC PHILIPPINE GOVERNMENT BARANGAY DOCUMENT PREVIEW -->
+        <div class="card-custom p-3">
+            <h6 class="fw-bold text-secondary mb-2">OFFICIAL DOCUMENT PREVIEW</h6>
+
+            <div id="printArea" class="border p-4 bg-white text-dark shadow-sm position-relative" style="font-family: 'Times New Roman', Times, serif; font-size: 0.85rem; min-height: 520px; line-height: 1.4;">
+
+                <!-- OFFICIAL HEADER WITH DUAL SEALS -->
+                <div class="d-flex align-items-center justify-content-between mb-2 pb-2 border-bottom border-2 border-dark">
+                    <!-- MUNICIPALITY OF MARAGUSAN LOGO (.jfif) -->
+                    <div class="text-center" style="width: 60px;">
+                        <img src="~/images/maragusan-logo.jfif" alt="Maragusan Logo" style="width: 55px; height: 55px; object-fit: contain;" />
+                    </div>
+                    <div class="text-center flex-grow-1">
+                        <small class="d-block text-uppercase fw-normal" style="font-size: 0.65rem; letter-spacing: 1px;">Republic of the Philippines</small>
+                        <small class="d-block text-uppercase fw-bold" style="font-size: 0.7rem;">Province of Davao de Oro</small>
+                        <small class="d-block text-uppercase fw-bold" style="font-size: 0.75rem;">Municipality of Maragusan</small>
+                        <strong class="d-block text-uppercase fw-bold text-primary" style="font-size: 0.85rem;">BARANGAY NEW KATIPUNAN</strong>
+                        <small class="d-block italic fw-bold text-danger" style="font-size: 0.65rem;">OFFICE OF THE PUNONG BARANGAY</small>
+                    </div>
+                    <div class="text-center" style="width: 60px;">
+                        <i class="fa-solid fa-landmark text-primary fs-1"></i>
+                    </div>
+                </div>
+
+                <!-- DOCUMENT TITLE -->
+                <div class="text-center my-3">
+                    <h5 class="fw-bold text-uppercase mb-0 text-decoration-underline" id="previewTitle" style="letter-spacing: 1.5px;">BARANGAY CLEARANCE</h5>
+                </div>
+
+                <!-- SALUTATION -->
+                <p class="fw-bold my-2" style="font-size: 0.8rem;">TO WHOM IT MAY CONCERN:</p>
+
+                <!-- LEGAL BODY TEXT (DYNAMICALLY POPULATED BASED ON DOCUMENT TYPE) -->
+                <div id="previewBodyContent">
+                    <!-- Default Initial Text -->
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This is to certify that <strong class="text-uppercase fw-bold text-dark" id="previewName">JUAN MENDOZA DELA CRUZ</strong>,
+                        of legal age, <span id="previewCivilStatus">Single</span>, Filipino, and a bona fide resident of
+                        <span id="previewAddress">Purok 4, Barangay New Katipunan, Maragusan, Davao de Oro</span>, is known to me to be a person of good moral character and a law-abiding citizen in this community.
+                    </p>
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This further certifies that per records available in this office, the above-named person has <strong>NO DEROGATORY RECORD</strong> nor pending criminal or civil case filed against him/her in this Barangay.
+                    </p>
+                    <p class="mb-4 text-justify" style="text-indent: 2rem;">
+                        This clearance/certificate is issued upon the request of the interested party for <strong class="text-uppercase" id="previewPurpose">FOR EMPLOYMENT</strong> and for whatever legal intent it may serve.
+                    </p>
+                </div>
+
+                <p class="mb-4">
+                    GIVEN this <strong id="previewDate">@DateTime.Now.ToString("ddth 'day of' MMMM, yyyy")</strong> at the Office of the Punong Barangay, Barangay New Katipunan, Maragusan, Davao de Oro, Philippines.
+                </p>
+
+                <!-- FOOTER SIGNATURES & THUMBMARK SECTION -->
+                <div class="row align-items-end mt-4 pt-2">
+                    <div class="col-6 text-center">
+                        <div class="border border-dark mx-auto mb-1 d-flex align-items-center justify-content-center text-muted" style="width: 70px; height: 70px; font-size: 0.6rem;">
+                            RIGHT THUMBMARK
+                        </div>
+                        <small class="d-block border-top border-dark pt-1 fw-bold text-uppercase mx-auto" style="width: 140px; font-size: 0.65rem;" id="previewSignee">Applicant Signature</small>
+                    </div>
+                    <div class="col-6 text-center">
+                        <strong class="d-block text-uppercase fw-bold mb-0">HON. PUNONG BARANGAY</strong>
+                        <small class="d-block border-top border-dark pt-1 fw-bold text-uppercase" style="font-size: 0.65rem;">Punong Barangay</small>
+                    </div>
+                </div>
+
+                <!-- OFFICIAL RECORD TRACKING FOOTER -->
+                <div class="mt-4 pt-2 border-top border-secondary text-muted d-flex justify-content-between" style="font-size: 0.65rem; font-family: sans-serif;">
+                    <div>
+                        <div>Control No: <strong id="previewControlNo">CLR-@DateTime.Now.ToString("yyyyMMdd")-1024</strong></div>
+                        <div>O.R. No: <strong>OR-@(new Random().Next(100000, 999999))</strong></div>
+                    </div>
+                    <div class="text-end">
+                        <div>Amount Paid: <strong>₱ 50.00</strong></div>
+                        <div>Validity: <strong>6 Months from Date Issued</strong></div>
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ACTION BUTTONS -->
+            <div class="d-flex gap-2 mt-3">
+                <button class="btn btn-primary btn-sm flex-fill fw-bold" onclick="window.print()">
+                    <i class="fa-solid fa-print me-1"></i> PRINT OFFICIAL DOCUMENT
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- NEW RESIDENT MODAL -->
+<div class="modal fade" id="newResidentModal" tabindex="-1" aria-labelledby="newResidentModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form asp-action="CreateResident" method="post">
+                <div class="modal-header bg-primary text-white">
+                    <h5 class="modal-title fw-bold" id="newResidentModalLabel"><i class="fa-solid fa-user-plus me-2"></i> Register New Resident</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">First Name *</label>
+                            <input type="text" class="form-control form-control-sm" name="FirstName" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Middle Name</label>
+                            <input type="text" class="form-control form-control-sm" name="MiddleName" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Last Name *</label>
+                            <input type="text" class="form-control form-control-sm" name="LastName" required />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Suffix</label>
+                            <input type="text" class="form-control form-control-sm" name="Suffix" placeholder="Jr., III" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Gender</label>
+                            <select class="form-select form-select-sm" name="Gender">
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Birth Date</label>
+                            <input type="date" class="form-control form-control-sm" name="BirthDate" value="2000-01-01" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Civil Status</label>
+                            <select class="form-select form-select-sm" name="CivilStatus">
+                                <option value="Single">Single</option>
+                                <option value="Married">Married</option>
+                                <option value="Widowed">Widowed</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label small fw-bold">Address Line</label>
+                            <input type="text" class="form-control form-control-sm" name="AddressLine" placeholder="House No., Street" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Purok *</label>
+                            <select class="form-select form-select-sm" name="Purok" required>
+                                <option value="1">Purok 1</option>
+                                <option value="2">Purok 2</option>
+                                <option value="3">Purok 3</option>
+                                <option value="4" selected>Purok 4</option>
+                                <option value="5">Purok 5</option>
+                                <option value="6">Purok 6</option>
+                                <option value="7">Purok 7</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Contact Number</label>
+                            <input type="text" class="form-control form-control-sm" name="ContactNumber" placeholder="0912-345-6789" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Voter Status</label>
+                            <select class="form-select form-select-sm" name="VoterStatus">
+                                <option value="Registered Voter">Registered Voter</option>
+                                <option value="Not Registered">Not Registered</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary btn-sm px-4 fw-bold">Save Resident</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- EDIT RESIDENT MODAL -->
+<div class="modal fade" id="editResidentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+            <form asp-action="EditResident" method="post">
+                <input type="hidden" id="edit_ResidentID" name="ResidentID" />
+                <div class="modal-header bg-warning text-dark">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-user-pen me-2"></i> Edit Resident Profile</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <div class="row g-3">
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">First Name *</label>
+                            <input type="text" class="form-control form-control-sm" id="edit_FirstName" name="FirstName" required />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Middle Name</label>
+                            <input type="text" class="form-control form-control-sm" id="edit_MiddleName" name="MiddleName" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Last Name *</label>
+                            <input type="text" class="form-control form-control-sm" id="edit_LastName" name="LastName" required />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Suffix</label>
+                            <input type="text" class="form-control form-control-sm" id="edit_Suffix" name="Suffix" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Gender</label>
+                            <select class="form-select form-select-sm" id="edit_Gender" name="Gender">
+                                <option value="Male">Male</option>
+                                <option value="Female">Female</option>
+                            </select>
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Birth Date</label>
+                            <input type="date" class="form-control form-control-sm" id="edit_BirthDate" name="BirthDate" />
+                        </div>
+                        <div class="col-md-3">
+                            <label class="form-label small fw-bold">Civil Status</label>
+                            <select class="form-select form-select-sm" id="edit_CivilStatus" name="CivilStatus">
+                                <option value="Single">Single</option>
+                                <option value="Married">Married</option>
+                                <option value="Widowed">Widowed</option>
+                            </select>
+                        </div>
+                        <div class="col-md-8">
+                            <label class="form-label small fw-bold">Address Line</label>
+                            <input type="text" class="form-control form-control-sm" id="edit_AddressLine" name="AddressLine" />
+                        </div>
+                        <div class="col-md-4">
+                            <label class="form-label small fw-bold">Purok *</label>
+                            <select class="form-select form-select-sm" id="edit_Purok" name="Purok" required>
+                                <option value="1">Purok 1</option>
+                                <option value="2">Purok 2</option>
+                                <option value="3">Purok 3</option>
+                                <option value="4">Purok 4</option>
+                                <option value="5">Purok 5</option>
+                                <option value="6">Purok 6</option>
+                                <option value="7">Purok 7</option>
+                            </select>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Contact Number</label>
+                            <input type="text" class="form-control form-control-sm" id="edit_ContactNumber" name="ContactNumber" />
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label small fw-bold">Voter Status</label>
+                            <select class="form-select form-select-sm" id="edit_VoterStatus" name="VoterStatus">
+                                <option value="Registered Voter">Registered Voter</option>
+                                <option value="Not Registered">Not Registered</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary btn-sm" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-warning btn-sm px-4 fw-bold">Update Resident</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<!-- DELETE CONFIRMATION MODAL -->
+<div class="modal fade" id="deleteResidentModal" tabindex="-1" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+            <form asp-action="DeleteResident" method="post">
+                <input type="hidden" id="delete_ResidentID" name="id" />
+                <div class="modal-header bg-danger text-white">
+                    <h5 class="modal-title fw-bold"><i class="fa-solid fa-trash-can me-2"></i> Delete Resident</h5>
+                    <button type="button" class="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body text-center py-4">
+                    <i class="fa-solid fa-circle-exclamation text-danger fs-1 mb-3"></i>
+                    <h5>Are you sure you want to delete this record?</h5>
+                    <p class="text-muted mb-0"><strong id="delete_ResidentName"></strong> will be permanently removed from the database.</p>
+                </div>
+                <div class="modal-footer justify-content-center">
+                    <button type="button" class="btn btn-secondary btn-sm px-4" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-danger btn-sm px-4 fw-bold">Confirm Delete</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+<script>
+    // Trigger preview update on page load
+    window.addEventListener("DOMContentLoaded", function () {
+        updatePreview();
+    });
+
+    function handlePurposeChange() {
+        var purposeSelect = document.getElementById("purposeSelect");
+        var customContainer = document.getElementById("customPurposeContainer");
+        var customInput = document.getElementById("customPurposeInput");
+
+        if (purposeSelect.value === "Other") {
+            customContainer.classList.remove("d-none");
+            customInput.focus();
+        } else {
+            customContainer.classList.add("d-none");
+            customInput.value = "";
+        }
+        updatePreview();
+    }
+
+    function updatePreview() {
+        var residentDropdown = document.getElementById("residentSelect");
+        if (!residentDropdown || residentDropdown.options.length === 0) return;
+
+        var selectedOption = residentDropdown.options[residentDropdown.selectedIndex];
+
+        var selectedName = selectedOption ? selectedOption.getAttribute("data-fullname") : "";
+        var purok = selectedOption ? selectedOption.getAttribute("data-purok") : "4";
+        var address = selectedOption ? selectedOption.getAttribute("data-address") : "";
+        var civilStatus = selectedOption ? selectedOption.getAttribute("data-civilstatus") : "Single";
+
+        var docTypeElement = document.getElementById("docTypeSelect");
+        var docType = docTypeElement ? docTypeElement.value : "Barangay Clearance";
+
+        var purposeSelect = document.getElementById("purposeSelect");
+        var purpose = purposeSelect ? purposeSelect.value : "For Employment";
+
+        if (purpose === "Other") {
+            var customVal = document.getElementById("customPurposeInput").value;
+            purpose = customVal.trim() !== "" ? customVal : "For Official Purpose";
+        }
+
+        // Update Document Title Header
+        var titleElement = document.getElementById("previewTitle");
+        if (titleElement) titleElement.innerText = docType.toUpperCase();
+
+        var signeeElement = document.getElementById("previewSignee");
+        if (signeeElement) signeeElement.innerText = selectedName;
+
+        // Dynamic Body Content Rendering per Document Type
+        var bodyContainer = document.getElementById("previewBodyContent");
+        if (!bodyContainer) return;
+
+        var fullAddress = address ? (address + ", Purok " + purok + ", Barangay New Katipunan, Maragusan, Davao de Oro") : ("Purok " + purok + ", Barangay New Katipunan, Maragusan, Davao de Oro");
+
+        if (docType === "Certificate of Indigency") {
+            bodyContainer.innerHTML = `
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This is to certify that <strong class="text-uppercase fw-bold text-dark">${selectedName}</strong>, of legal age, <span>${civilStatus}</span>, Filipino, is a bona fide resident of <span>${fullAddress}</span>.
+                    </p>
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This further certifies that the above-named individual belongs to one of the <strong>INDIGENT FAMILIES</strong> in this Barangay, having no fixed income or insufficient financial means to support daily living requirements.
+                    </p>
+                    <p class="mb-4 text-justify" style="text-indent: 2rem;">
+                        This certification is issued upon the request of the interested party for <strong class="text-uppercase">${purpose}</strong> and for whatever legal intent it may serve.
+                    </p>`;
+        }
+        else if (docType === "Certificate of Residency") {
+            bodyContainer.innerHTML = `
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This is to certify that <strong class="text-uppercase fw-bold text-dark">${selectedName}</strong>, of legal age, <span>${civilStatus}</span>, Filipino, is an official and bona fide resident presently residing at <span>${fullAddress}</span>.
+                    </p>
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This certifies that per records of this office, the above-mentioned person has been residing in this Barangay community and is known to be a peaceful and law-abiding resident.
+                    </p>
+                    <p class="mb-4 text-justify" style="text-indent: 2rem;">
+                        This certificate of residency is issued upon request of the interested party for <strong class="text-uppercase">${purpose}</strong>.
+                    </p>`;
+        }
+        else if (docType === "Business Permit") {
+            bodyContainer.innerHTML = `
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        Barangay Clearance is hereby granted to <strong class="text-uppercase fw-bold text-dark">${selectedName}</strong> to operate and maintain a commercial business establishment located at <span>${fullAddress}</span>.
+                    </p>
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This clearance is granted after verifying that the business operation complies with existing local Barangay rules, health standards, and safety ordinances.
+                    </p>
+                    <p class="mb-4 text-justify" style="text-indent: 2rem;">
+                        Issued for <strong class="text-uppercase">${purpose}</strong> subject to renewal and compliance with Municipal licensing conditions.
+                    </p>`;
+        }
+        else if (docType === "Certificate of Low Income") {
+            bodyContainer.innerHTML = `
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This is to certify that <strong class="text-uppercase fw-bold text-dark">${selectedName}</strong>, of legal age, <span>${civilStatus}</span>, Filipino, and a permanent resident of <span>${fullAddress}</span>, belongs to a low-income household with minimal and irregular earnings.
+                    </p>
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This certification is issued upon the request of the applicant for <strong class="text-uppercase">${purpose}</strong> financial assistance or subsidy qualification.
+                    </p>
+                    <p class="mb-4 text-justify" style="text-indent: 2rem;">
+                        Given for whatever legal purpose this may serve the bearer.
+                    </p>`;
+        }
+        else if (docType === "Certificate of Good Moral Character") {
+            bodyContainer.innerHTML = `
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This is to certify that <strong class="text-uppercase fw-bold text-dark">${selectedName}</strong>, of legal age, <span>${civilStatus}</span>, Filipino, and a resident of <span>${fullAddress}</span>, is personally known to be of good moral character, peace-loving, and civic-minded.
+                    </p>
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This office further certifies that he/she has not been involved in any local community scandals or administrative infractions, and bears a clean record within our jurisdiction.
+                    </p>
+                    <p class="mb-4 text-justify" style="text-indent: 2rem;">
+                        Issued upon request for <strong class="text-uppercase">${purpose}</strong>.
+                    </p>`;
+        }
+        else if (docType === "Certificate of Cohabitation") {
+            bodyContainer.innerHTML = `
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This is to certify that <strong class="text-uppercase fw-bold text-dark">${selectedName}</strong> and partner, residents of <span>${fullAddress}</span>, have been known in this community to be living together as husband and wife (cohabitation) openly and continuously without any legal impediment.
+                    </p>
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This certification is issued upon request for <strong class="text-uppercase">${purpose}</strong>.
+                    </p>`;
+        }
+        else if (docType === "First Time Jobseeker Certificate") {
+            bodyContainer.innerHTML = `
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        Pursuant to Republic Act No. 11261 (First Time Jobseekers Assistance Act), this is to certify that <strong class="text-uppercase fw-bold text-dark">${selectedName}</strong>, of legal age, <span>${civilStatus}</span>, is a bona fide resident of <span>${fullAddress}</span>, and is a first-time jobseeker.
+                    </p>
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This certifies that the holder is entitled to full exemption from payment of government fees and charges in securing local or national documents required for employment.
+                    </p>
+                    <p class="mb-4 text-justify" style="text-indent: 2rem;">
+                        Issued this day for <strong class="text-uppercase">${purpose}</strong>.
+                    </p>`;
+        }
+        else {
+            // Default: Barangay Clearance
+            bodyContainer.innerHTML = `
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This is to certify that <strong class="text-uppercase fw-bold text-dark">${selectedName}</strong>, of legal age, <span>${civilStatus}</span>, Filipino, and a bona fide resident of <span>${fullAddress}</span>, is known to me to be a person of good moral character and a law-abiding citizen in this community.
+                    </p>
+                    <p class="mb-3 text-justify" style="text-indent: 2rem;">
+                        This further certifies that per records available in this office, the above-named person has <strong>NO DEROGATORY RECORD</strong> nor pending criminal or civil case filed against him/her in this Barangay.
+                    </p>
+                    <p class="mb-4 text-justify" style="text-indent: 2rem;">
+                        This clearance/certificate is issued upon the request of the interested party for <strong class="text-uppercase">${purpose}</strong> and for whatever legal intent it may serve.
+                    </p>`;
+        }
+    }
+
+    function prepareFormSubmission() {
+        var purposeSelect = document.getElementById("purposeSelect");
+        var finalPurpose = purposeSelect.value;
+
+        if (finalPurpose === "Other") {
+            var customVal = document.getElementById("customPurposeInput").value;
+            finalPurpose = customVal.trim() !== "" ? customVal : "For Official Purpose";
+        }
+
+        document.getElementById("hiddenPurpose").value = finalPurpose;
+    }
+
+    function openEditModal(id, firstName, middleName, lastName, suffix, gender, birthDate, civilStatus, address, purok, contact, voter) {
+        document.getElementById('edit_ResidentID').value = id;
+        document.getElementById('edit_FirstName').value = firstName;
+        document.getElementById('edit_MiddleName').value = middleName;
+        document.getElementById('edit_LastName').value = lastName;
+        document.getElementById('edit_Suffix').value = suffix;
+        document.getElementById('edit_Gender').value = gender;
+        document.getElementById('edit_BirthDate').value = birthDate;
+        document.getElementById('edit_CivilStatus').value = civilStatus;
+        document.getElementById('edit_AddressLine').value = address;
+        document.getElementById('edit_Purok').value = purok;
+        document.getElementById('edit_ContactNumber').value = contact;
+        document.getElementById('edit_VoterStatus').value = voter;
+
+        var editModal = new bootstrap.Modal(document.getElementById('editResidentModal'));
+        editModal.show();
+    }
+
+    function openDeleteModal(id, fullName) {
+        document.getElementById('delete_ResidentID').value = id;
+        document.getElementById('delete_ResidentName').innerText = fullName;
+
+        var deleteModal = new bootstrap.Modal(document.getElementById('deleteResidentModal'));
+        deleteModal.show();
+    }
+</script>
